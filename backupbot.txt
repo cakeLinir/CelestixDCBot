@@ -1,0 +1,119 @@
+import aiohttp
+import nextcord
+from nextcord.ext import commands
+from nextcord import Interaction
+import os
+import requests
+from dotenv import load_dotenv
+
+# .env Datei laden
+load_dotenv()
+TOKEN = os.getenv("DISCORD_TOKEN")
+GUILD_ID = int(os.getenv("GUILD_ID"))
+RIOT_API_KEY = os.getenv("RIOT_API_KEY")
+
+print(f"Geladener API-Key: {RIOT_API_KEY}")
+
+# Mapping Valorant-Rang -> Discord RoleID
+RANK_ROLE_MAPPING = {
+    "Iron 1": 1353422873745948875,
+    "Iron 2": 1353422888589332631,
+    "Iron 3": 1353422891965747273,
+    "Bronze 1": 1353422895581237370,
+    "Bronze 2": 1353422899570282576,
+    "Bronze 3": 1353422903361802260,
+    "Silver 1": 1353422906876493884,
+    "Silver 2": 1353422910215159859,
+    "Silver 3": 1353422913587515436,
+    "Gold 1": 1356679687681605663,
+    "Gold 2": 1356679724838944819,
+    "Gold 3": 1356679849808367752,
+    "Platinum 1": 1356679862836002996,
+    "Platinum 2": 1356679873040486553,
+    "Platinum 3": 1356679883761385542,
+    "Diamond 1": 1356679892242272306,
+    "Diamond 2": 1356679928518672504,
+    "Diamond 3": 1356679940082503882,
+    "Ascendant 1": 1356679953772712069,
+    "Ascendant 2": 1356679965453586726,
+    "Ascendant 3": 1356679989889601667,
+    "Immortal 1": 1356679998982848593,
+    "Immortal 2": 1356680009401499705,
+    "Immortal 3": 1356680021577699439,
+    "Radiant": 1356680032856182814
+}
+
+# Bot-Intents aktivieren
+intents = nextcord.Intents.default()
+intents.guilds = True
+intents.messages = True
+intents.message_content = True
+intents.members = True
+
+bot = commands.Bot(command_prefix="/", intents=intents)
+
+
+# Funktion zum Abrufen des PUUID
+async def get_puuid(game_name, tag_line):
+    url = f"https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}"
+    headers = {"X-Riot-Token": RIOT_API_KEY}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json().get("puuid")
+    return None
+
+
+# Funktion zum Abrufen des Valorant-Rangs
+async def get_valorant_rank(puuid):
+    url = f"https://europe.api.riotgames.com/val/ranked/v1/by-puuid/{puuid}"
+    headers = {"X-Riot-Token": RIOT_API_KEY}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as response:
+            if response.status != 200:
+                print(f"Fehler beim Abrufen des Rangs: {response.status}")
+                return None
+
+            data = await response.json()
+            if not data or "currenttierpatched" not in data:
+                print("Kein Rang gefunden.")
+                return None
+
+            return data["currenttierpatched"]
+
+
+# Slash-Command zum Verifizieren von Valorant Rängen
+@bot.slash_command(guild_ids=[GUILD_ID], description="Verify your Valorant Rank")
+async def verify(interaction: Interaction, riot_id: str):
+    await interaction.response.defer()
+
+    try:
+        game_name, tag_line = riot_id.split("#")
+    except ValueError:
+        await interaction.followup.send("Fehler: Bitte gib deinen Riot-Namen im Format `Spieler#Tag` an.")
+        return
+
+    puuid = await get_puuid(game_name, tag_line)
+    if not puuid:
+        await interaction.followup.send("Fehler: Riot-Account nicht gefunden.")
+        return
+
+    rank = await get_valorant_rank(puuid)
+    if not rank or rank not in RANK_ROLE_MAPPING:
+        await interaction.followup.send("Fehler: Dein Rang konnte nicht ermittelt werden.")
+        return
+
+    role_id = RANK_ROLE_MAPPING[rank]
+    role = interaction.guild.get_role(role_id)
+    if not role:
+        await interaction.followup.send("Fehler: Rang-Rolle existiert nicht auf dem Server.")
+        return
+
+    member = interaction.guild.get_member(interaction.user.id)
+    await member.add_roles(role)
+    await interaction.followup.send(
+        f"Erfolgreich! Dein Rang **{rank}** wurde erkannt und die entsprechende Rolle wurde dir zugewiesen.")
+
+
+# Bot starten
+bot.run(TOKEN)
