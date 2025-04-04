@@ -111,17 +111,15 @@ async def setup_rank_verification(interaction: Interaction, channel_id: str = Sl
             return
 
         embed = Embed(
-            title="🎯 Valorant Rang-Verifikation",
-            description="Wähle deinen aktuellen Rang aus dem Dropdown-Menü unten.\nDer Bot wird dir automatisch die passende Rolle zuweisen.",
+            title="Valorant Rang-System",
+            description="Wähle deinen aktuellen Rang aus dem Dropdown-Menü unten.\nDer Bot wird dir automatisch die passende Rolle zuweisen.\nBitte sei so Ehrlich und verwende nur den Rank den du aktuell hast.\n\n## WICHTIG:\nWenn du einen neuen Rang erreichst oder dropst kannst du dir deinen neuen rang Erneut zuweisen.",
             color=Colour.dark_red()
         )
+        embed.set_thumbnail(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/master/pictures/Celestix_Transparent.png")
+        embed.set_image(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/refs/heads/master/pictures/Valorant_Rank_übersicht.png?token=GHSAT0AAAAAADBQEV4QSZDRULZTGDE3GXN4Z7QM42Q")
         embed.set_footer(text="Celestix Rank System • Valorant Edition")
 
-        message = await channel.send(embed=embed, view=RankSelectView())
-
-        # Speichere die Message-ID
-        save_message_id(message.id)
-
+        await channel.send(embed=embed, view=RankSelectView())
         await interaction.response.send_message("Setup erfolgreich abgeschlossen!", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"Fehler beim Setup: {e}", ephemeral=True)
