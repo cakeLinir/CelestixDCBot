@@ -116,7 +116,7 @@ async def setup_rank_verification(interaction: Interaction, channel_id: str = Sl
             color=Colour.dark_red()
         )
         embed.set_thumbnail(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/master/pictures/Celestix_Transparent.png")
-        embed.set_image(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/refs/heads/master/pictures/Valorant_Rank_übersicht.png?token=GHSAT0AAAAAADBQEV4QSZDRULZTGDE3GXN4Z7QM42Q")
+        embed.set_image(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/master/pictures/Celestix_Transparent.png")
         embed.set_footer(text="Celestix Rank System • Valorant Edition")
 
         await channel.send(embed=embed, view=RankSelectView())
