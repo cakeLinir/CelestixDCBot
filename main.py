@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 # Load environment variables (for TOKEN and GUILD_ID)
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID"))
+GUILD_ID = os.getenv("GUILD_ID")
+if not GUILD_ID:
+    raise ValueError("GUILD_ID ist nicht in der .env-Datei gesetzt!")
+GUILD_ID = int(GUILD_ID)
 
 DATA_FILE = "message_data.json"  # Datei für gespeicherte Message-ID
 
@@ -42,7 +45,6 @@ RANK_ROLE_MAPPING = {
     "Radiant": 1356680032856182814
 }
 
-# Start bot
 intents = nextcord.Intents.default()
 intents.guilds = True
 intents.members = True
@@ -50,12 +52,11 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# Select UI for Valorant Rank Roles
 class RankSelect(Select):
     def __init__(self):
         options = [
             SelectOption(label=rank, description=f"Rolle für {rank} wählen", value=rank)
-            for rank in RANK_ROLE_MAPPING.keys()
+            for rank in RANK_ROLE_MAPPING
         ]
         super().__init__(
             placeholder="Wähle deinen Valorant Rang...",
@@ -72,28 +73,23 @@ class RankSelect(Select):
             return
 
         member = interaction.user
-        # Entferne alte Rangrollen
         roles_to_remove = [r for r in member.roles if r.id in RANK_ROLE_MAPPING.values()]
         for r in roles_to_remove:
             await member.remove_roles(r)
 
-        # Füge neue Rolle hinzu
         new_role = interaction.guild.get_role(role_id)
         await member.add_roles(new_role)
         await interaction.response.send_message(f"Du hast jetzt die Rolle **{chosen_rank}** erhalten.", ephemeral=True)
-
 
 class RankSelectView(View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(RankSelect())
 
-# Speichert die Message-ID für persistente Views
 def save_message_id(message_id):
     with open(DATA_FILE, "w") as file:
         json.dump({"message_id": message_id}, file)
 
-# Lädt gespeicherte Message-ID
 def load_message_id():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as file:
@@ -101,9 +97,15 @@ def load_message_id():
             return data.get("message_id")
     return None
 
-# Setup Command
-@bot.slash_command(name="setup_rank_verification", description="Postet das Valorant Rang-Auswahl-Embed", guild_ids=[GUILD_ID])
-async def setup_rank_verification(interaction: Interaction, channel_id: str = SlashOption(description="Channel-ID für das Embed")):
+@bot.slash_command(
+    name="setup_rank_verification",
+    description="Postet das Valorant Rang-Auswahl-Embed",
+    guild_ids=[GUILD_ID]
+)
+async def setup_rank_verification(
+    interaction: Interaction,
+    channel_id: str = SlashOption(description="Channel-ID für das Embed")
+):
     try:
         channel = interaction.guild.get_channel(int(channel_id))
         if not channel:
@@ -112,27 +114,37 @@ async def setup_rank_verification(interaction: Interaction, channel_id: str = Sl
 
         embed = Embed(
             title="Valorant Rang-System",
-            description="Wähle deinen aktuellen Rang aus dem Dropdown-Menü unten.\nDer Bot wird dir automatisch die passende Rolle zuweisen.",
+            description=(
+                "Wähle deinen aktuellen Rang aus dem Dropdown-Menü unten.\n"
+                "Der Bot wird dir automatisch die passende Rolle zuweisen.\n\n"
+                "## Wichtige Information:\n"
+                "Du kannst deine Rolle jederzeit ändern, indem du erneut auswählst.\n"
+                "### Hinweis:\n"
+                "Sei bitte ehrlich und wähle nur den Rank aus, den du derzeit hast."
+            ),
             color=Colour.dark_red()
         )
         embed.set_thumbnail(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/master/pictures/Celestix_Transparent.png")
-        embed.set_image(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/master/pictures/Valorant_Rank_übersicht.png")
+        embed.set_image(url="https://raw.githubusercontent.com/cakeLinir/CelestixDCBot/master/pictures/Valorant_Rank_%C3%BCbersicht.png")
         embed.set_footer(text="Celestix Rank System • Valorant Edition • Beta v1.0")
 
-        await channel.send(embed=embed, view=RankSelectView())
+        message = await channel.send(embed=embed, view=RankSelectView())
+        save_message_id(message.id)
+
         await interaction.response.send_message("Setup erfolgreich abgeschlossen!", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"Fehler beim Setup: {e}", ephemeral=True)
 
-# Event: Nach Neustart die View wiederherstellen
 @bot.event
 async def on_ready():
     print(f"✅ Bot ist eingeloggt als {bot.user}")
 
-    # Lade die gespeicherte Nachricht-ID
     message_id = load_message_id()
     if message_id:
         guild = bot.get_guild(GUILD_ID)
+        if not guild:
+            print("⚠ GUILD_ID nicht gefunden. Ist der Bot auf dem Server?")
+            return
         for channel in guild.text_channels:
             try:
                 message = await channel.fetch_message(message_id)
@@ -145,5 +157,4 @@ async def on_ready():
     else:
         print("⚠ Keine gespeicherte Message-ID gefunden. Bitte `/setup_rank_verification` erneut ausführen.")
 
-# Bot starten
 bot.run(TOKEN)
