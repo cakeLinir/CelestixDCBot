@@ -14,6 +14,8 @@ if not GUILD_ID:
     raise ValueError("GUILD_ID ist nicht in der .env-Datei gesetzt!")
 GUILD_ID = int(GUILD_ID)
 
+EMOJI_CACHE = {}
+
 DATA_FILE = "message_data.json"  # Datei für gespeicherte Message-ID
 
 # Rank to Role ID mapping
@@ -44,6 +46,33 @@ RANK_ROLE_MAPPING = {
     "Immortal 3": 1356680021577699439,
     "Radiant": 1356680032856182814
 }
+RANK_EMOJI_MAPPING = {
+    "Iron 1": 1357880382963449946,
+    "Iron 2": 1357880385362727009,
+    "Iron 3": 1357880584747352234,
+    "Bronze 1": 1357880358460461168,
+    "Bronze 2": 1357880360259686500,
+    "Bronze 3": 1357880362264428794,
+    "Silver 1": 1357880400566816969,
+    "Silver 2": 1357880403456823296,
+    "Silver 3": 1357880406908862464,
+    "Gold 1": 1357880369348743399,
+    "Gold 2": 1357880581295308930,
+    "Gold 3": 1357880373136064542,
+    "Platinum 1": 1357880390190366932,
+    "Platinum 2": 1357880392912343251,
+    "Platinum 3": 1357880396091490525,
+    "Diamond 1": 1357880363665461348,
+    "Diamond 2": 1357880365766938872,
+    "Diamond 3": 1357880367805366534,
+    "Ascendant 1": 1357880353687208240,
+    "Ascendant 2": 1357880354966601784,
+    "Ascendant 3": 1357880357172809798,
+    "Immortal 1": 1357880375908761794,
+    "Immortal 2": 1357880582935150608,
+    "Immortal 3": 1357880380371238912,
+    "Radiant": 1357880579307343872
+}
 
 intents = nextcord.Intents.default()
 intents.guilds = True
@@ -54,10 +83,21 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 
 class RankSelect(Select):
     def __init__(self):
-        options = [
-            SelectOption(label=rank, description=f"Rolle für {rank} wählen", value=rank)
-            for rank in RANK_ROLE_MAPPING
-        ]
+        options = []
+
+        for rank in RANK_ROLE_MAPPING:
+            emoji_id = RANK_EMOJI_MAPPING.get(rank)
+            emoji = EMOJI_CACHE.get(emoji_id)
+
+            options.append(
+                SelectOption(
+                    label=rank,
+                    description=f"Rolle für {rank} wählen",
+                    value=rank,
+                    emoji=emoji  # wird ignoriert, wenn None
+                )
+            )
+
         super().__init__(
             placeholder="Wähle deinen Valorant Rang...",
             min_values=1,
@@ -79,7 +119,15 @@ class RankSelect(Select):
 
         new_role = interaction.guild.get_role(role_id)
         await member.add_roles(new_role)
-        await interaction.response.send_message(f"Du hast jetzt die Rolle **{chosen_rank}** erhalten.", ephemeral=True)
+
+        emoji_id = RANK_EMOJI_MAPPING.get(chosen_rank)
+        emoji = EMOJI_CACHE.get(emoji_id)
+        emoji_preview = f"{emoji}" if emoji else ""
+        await interaction.response.send_message(
+            f"Du hast jetzt die Rolle **{chosen_rank}** {emoji_preview} erhalten.",
+            ephemeral=True
+        )
+
 
 class RankSelectView(View):
     def __init__(self):
@@ -138,6 +186,15 @@ async def setup_rank_verification(
 @bot.event
 async def on_ready():
     print(f"✅ Bot ist eingeloggt als {bot.user}")
+
+    # Emoji Cache laden
+    global EMOJI_CACHE
+    guild = bot.get_guild(GUILD_ID)
+    if guild:
+        EMOJI_CACHE = {e.id: e for e in guild.emojis}
+        print(f"📦 {len(EMOJI_CACHE)} benutzerdefinierte Emojis gecached.")
+    else:
+        print("⚠ GUILD_ID nicht gefunden oder Bot ist nicht auf dem Server.")
 
     message_id = load_message_id()
     if message_id:
