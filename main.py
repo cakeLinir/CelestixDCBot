@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import nextcord
 from nextcord import Interaction, SlashOption, Embed, SelectOption, Colour
 from nextcord.ext import commands
@@ -5,6 +7,16 @@ from nextcord.ui import View, Select
 import os
 import json
 from dotenv import load_dotenv
+
+# Logging-Konfiguration
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("bot.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # Load environment variables (for TOKEN and GUILD_ID)
 load_dotenv()
@@ -16,9 +28,9 @@ GUILD_ID = int(GUILD_ID)
 
 EMOJI_CACHE = {}
 
-DATA_FILE = "message_data.json"  # Datei für gespeicherte Message-ID
+DATA_FILE = "message_data.json"
 
-# Rank to Role ID mapping
+# Role & Emoji Mapping
 RANK_ROLE_MAPPING = {
     "Iron 1": 1353422873745948875,
     "Iron 2": 1353422888589332631,
@@ -46,6 +58,7 @@ RANK_ROLE_MAPPING = {
     "Immortal 3": 1356680021577699439,
     "Radiant": 1356680032856182814
 }
+
 RANK_EMOJI_MAPPING = {
     "Iron 1": 1357880382963449946,
     "Iron 2": 1357880385362727009,
@@ -84,26 +97,18 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 class RankSelect(Select):
     def __init__(self):
         options = []
-
         for rank in RANK_ROLE_MAPPING:
             emoji_id = RANK_EMOJI_MAPPING.get(rank)
             emoji = EMOJI_CACHE.get(emoji_id)
-
             options.append(
                 SelectOption(
                     label=rank,
                     description=f"Rolle für {rank} wählen",
                     value=rank,
-                    emoji=emoji  # wird ignoriert, wenn None
+                    emoji=emoji
                 )
             )
-
-        super().__init__(
-            placeholder="Wähle deinen Valorant Rang...",
-            min_values=1,
-            max_values=1,
-            options=options,
-        )
+        super().__init__(placeholder="Wähle deinen Valorant Rang...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: Interaction):
         chosen_rank = self.values[0]
@@ -118,16 +123,16 @@ class RankSelect(Select):
             await member.remove_roles(r)
 
         new_role = interaction.guild.get_role(role_id)
-        await member.add_roles(new_role)
+        if new_role:
+            await member.add_roles(new_role)
 
         emoji_id = RANK_EMOJI_MAPPING.get(chosen_rank)
-        emoji = EMOJI_CACHE.get(emoji_id)
+        emoji = EMOJI_CACHE.get(emoji_id) or bot.get_emoji(emoji_id)
         emoji_preview = f"{emoji}" if emoji else ""
         await interaction.response.send_message(
             f"Du hast jetzt die Rolle **{chosen_rank}** {emoji_preview} erhalten.",
             ephemeral=True
         )
-
 
 class RankSelectView(View):
     def __init__(self):
@@ -152,7 +157,7 @@ def load_message_id():
 )
 async def setup_rank_verification(
     interaction: Interaction,
-    channel_id: str = SlashOption(description="Channel-ID für das Embed")
+    channel_id: int = SlashOption(description="Channel-ID für das Embed")
 ):
     try:
         channel = interaction.guild.get_channel(int(channel_id))
@@ -178,40 +183,37 @@ async def setup_rank_verification(
 
         message = await channel.send(embed=embed, view=RankSelectView())
         save_message_id(message.id)
-
         await interaction.response.send_message("Setup erfolgreich abgeschlossen!", ephemeral=True)
+
     except Exception as e:
         await interaction.response.send_message(f"Fehler beim Setup: {e}", ephemeral=True)
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot ist eingeloggt als {bot.user}")
-
-    # Emoji Cache laden
-    global EMOJI_CACHE
+    logging.info(f"✅ Bot ist eingeloggt als {bot.user}")
     guild = bot.get_guild(GUILD_ID)
+
     if guild:
+        global EMOJI_CACHE
         EMOJI_CACHE = {e.id: e for e in guild.emojis}
-        print(f"📦 {len(EMOJI_CACHE)} benutzerdefinierte Emojis gecached.")
-    else:
-        print("⚠ GUILD_ID nicht gefunden oder Bot ist nicht auf dem Server.")
+        logging.info(f"📦 {len(EMOJI_CACHE)} benutzerdefinierte Emojis gecached.")
 
-    message_id = load_message_id()
-    if message_id:
-        guild = bot.get_guild(GUILD_ID)
-        if not guild:
-            print("⚠ GUILD_ID nicht gefunden. Ist der Bot auf dem Server?")
-            return
-        for channel in guild.text_channels:
-            try:
-                message = await channel.fetch_message(message_id)
-                if message:
+        message_id = load_message_id()
+        if message_id:
+            for channel in guild.text_channels:
+                try:
+                    message = await channel.fetch_message(message_id)
                     await message.edit(view=RankSelectView())
-                    print(f"🔄 View für Nachricht {message_id} wurde wiederhergestellt!")
+                    logging.info(f"🔄 View für Nachricht {message_id} wurde wiederhergestellt!")
                     break
-            except nextcord.NotFound:
-                continue
+                except nextcord.NotFound:
+                    continue
     else:
-        print("⚠ Keine gespeicherte Message-ID gefunden. Bitte `/setup_rank_verification` erneut ausführen.")
+        logging.warning("⚠ GUILD_ID nicht gefunden oder Bot ist nicht auf dem Server.")
 
-bot.run(TOKEN)
+# Bot starten
+if __name__ == "__main__":
+    try:
+        bot.run(TOKEN)
+    except KeyboardInterrupt:
+        logging.info("Bot wird heruntergefahren...")
