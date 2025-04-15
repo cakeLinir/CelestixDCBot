@@ -212,7 +212,7 @@ async def on_ready():
         logging.warning("⚠ GUILD_ID nicht gefunden oder Bot ist nicht auf dem Server.")
 
 @bot.event
-async def on_connect():
+async def load_extensions():
     try:
         bot.load_extension("cogs.privacy")
         logging.info("🔧 Datenschutz-Cog erfolgreich geladen.")
@@ -222,7 +222,11 @@ async def on_connect():
 
 # Bot starten
 if __name__ == "__main__":
+    async def main():
+        await load_extensions()
+        await bot.start(TOKEN)
+
     try:
-        bot.run(TOKEN)
+        asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Bot wird heruntergefahren...")
