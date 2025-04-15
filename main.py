@@ -188,16 +188,28 @@ async def setup_rank_verification(
     except Exception as e:
         await interaction.response.send_message(f"Fehler beim Setup: {e}", ephemeral=True)
 
+# --- on_ready: Emoji Cache + View Restore + Cog Load ---
 @bot.event
 async def on_ready():
+    global EMOJI_CACHE
     logging.info(f"✅ Bot ist eingeloggt als {bot.user}")
     guild = bot.get_guild(GUILD_ID)
 
     if guild:
-        global EMOJI_CACHE
         EMOJI_CACHE = {e.id: e for e in guild.emojis}
         logging.info(f"📦 {len(EMOJI_CACHE)} benutzerdefinierte Emojis gecached.")
 
+        # Cogs laden
+        loaded = getattr(bot, "_cogs_loaded", False)
+        if not loaded:
+            try:
+                bot.load_extension("cogs.privacy")
+                bot._cogs_loaded = True
+                logging.info("🔧 Datenschutz-Cog erfolgreich geladen.")
+            except Exception as e:
+                logging.error(f"❌ Fehler beim Laden der Datenschutz-Cog: {e}")
+
+        # View wiederherstellen
         message_id = load_message_id()
         if message_id:
             for channel in guild.text_channels:
@@ -212,18 +224,14 @@ async def on_ready():
         logging.warning("⚠ GUILD_ID nicht gefunden oder Bot ist nicht auf dem Server.")
 
 @bot.event
-async def load_extensions():
-    try:
-        bot.load_extension("cogs.privacy")
-        logging.info("🔧 Datenschutz-Cog erfolgreich geladen.")
-    except Exception as e:
-        logging.error(f"❌ Fehler beim Laden der Datenschutz-Cog: {e}")
+async def on_connect():
+    await bot.sync_all_application_commands()
+    logging.info("✅ Slash Commands synchronisiert.")
 
 
 # Bot starten
 if __name__ == "__main__":
     async def main():
-        await load_extensions()
         await bot.start(TOKEN)
 
     try:
