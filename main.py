@@ -228,13 +228,14 @@ async def on_connect():
     await bot.sync_all_application_commands()
     logging.info("✅ Slash Commands synchronisiert.")
 
+@bot.event
+async def on_shutdown():
+    logging.info("Bot wird jetzt korrekt beendet.")
 
 # Bot starten
 if __name__ == "__main__":
-    async def main():
-        await bot.start(TOKEN)
-
     try:
-        asyncio.run(main())
+        bot.run(TOKEN)
     except KeyboardInterrupt:
         logging.info("Bot wird heruntergefahren...")
+
