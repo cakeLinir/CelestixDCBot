@@ -211,6 +211,15 @@ async def on_ready():
     else:
         logging.warning("⚠ GUILD_ID nicht gefunden oder Bot ist nicht auf dem Server.")
 
+@bot.event
+async def on_connect():
+    try:
+        bot.load_extension("cogs.privacy_cog")
+        logging.info("🔧 Datenschutz-Cog erfolgreich geladen.")
+    except Exception as e:
+        logging.error(f"❌ Fehler beim Laden der Datenschutz-Cog: {e}")
+
+
 # Bot starten
 if __name__ == "__main__":
     try:
