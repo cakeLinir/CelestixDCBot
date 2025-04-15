@@ -2,6 +2,7 @@ import nextcord
 from nextcord import Interaction, Embed, Colour
 from nextcord.ext import commands
 
+
 class PrivacyCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -30,6 +31,7 @@ class PrivacyCog(commands.Cog):
         embed.set_footer(text="CelestixDCBot • Datenschutz zuerst")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 def setup(bot):
     bot.add_cog(PrivacyCog(bot))
