@@ -214,7 +214,7 @@ async def on_ready():
 @bot.event
 async def on_connect():
     try:
-        bot.load_extension("cogs.privacy_cog")
+        bot.load_extension("cogs.privacy")
         logging.info("🔧 Datenschutz-Cog erfolgreich geladen.")
     except Exception as e:
         logging.error(f"❌ Fehler beim Laden der Datenschutz-Cog: {e}")
